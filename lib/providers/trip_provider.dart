@@ -127,19 +127,54 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
 
     BackgroundService.start();
 
+    // Calibration: Fetch exact absolute coordinate instantly before tracker loop buffers.
+    late Position initialPosition;
+    try {
+      initialPosition = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    } catch (_) {
+      initialPosition = await Geolocator.getLastKnownPosition() ?? Position(longitude: 0, latitude: 0, timestamp: DateTime.now(), accuracy: 0, altitude: 0, altitudeAccuracy: 0, heading: 0, headingAccuracy: 0, speed: 0, speedAccuracy: 0);
+    }
+    
+    final currentSpeed = initialPosition.speed * 3.6;
+
     final newTrip = TripModel(
       id: const Uuid().v4(),
       startTime: DateTime.now(),
       tripTitle: tripTitle,
       carDetails: carDetails,
+      totalDistance: 0.0,
+      maxSpeed: currentSpeed,
+      routePoints: initialPosition.latitude != 0 
+        ? [LocationPoint(latitude: initialPosition.latitude, longitude: initialPosition.longitude, timestamp: initialPosition.timestamp)]
+        : [],
     );
 
-    state = state.copyWith(status: TripStatus.tracking, activeTrip: newTrip);
+    state = state.copyWith(
+      status: TripStatus.tracking, 
+      activeTrip: newTrip,
+      currentSpeed: currentSpeed,
+      latestLat: initialPosition.latitude,
+      latestLon: initialPosition.longitude,
+    );
 
     LogService.info("Starting trip with title: ${tripTitle != null ? '[TRIP_TITLE_SET]' : 'UNSET'}, car: ${carDetails != null ? '[CAR_NAME_SET]' : 'UNSET'}");
     _positionStream?.cancel(); // Kill local stream since BackgroundEngine tracks now
     
     return null; // success
+  }
+
+  Future<void> syncCurrentLocation() async {
+    try {
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final speed = pos.speed * 3.6;
+      state = state.copyWith(
+        currentSpeed: speed < 0.1 ? 0.0 : speed,
+        latestLat: pos.latitude,
+        latestLon: pos.longitude,
+      );
+    } catch (e) {
+      LogService.error("Failed to sync location manually: $e");
+    }
   }
 
   void _processBgLocationUpdate(Map<String, dynamic> data) {
