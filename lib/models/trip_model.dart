@@ -23,6 +23,12 @@ class TripModel extends HiveObject {
   @HiveField(5)
   List<LocationPoint> routePoints;
 
+  @HiveField(6)
+  String? tripTitle;
+
+  @HiveField(7)
+  String? carDetails;
+
   TripModel({
     required this.id,
     required this.startTime,
@@ -30,5 +36,7 @@ class TripModel extends HiveObject {
     this.totalDistance = 0.0,
     this.maxSpeed = 0.0,
     this.routePoints = const [],
+    this.tripTitle,
+    this.carDetails,
   });
 }
