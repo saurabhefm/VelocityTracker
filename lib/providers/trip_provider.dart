@@ -9,9 +9,9 @@ import '../models/trip_model.dart';
 import '../models/enums.dart';
 import '../models/location_point.dart';
 import '../services/storage_service.dart';
-import '../services/storage_service.dart';
 import '../services/background_service.dart';
 import '../services/log_service.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class TripState {
@@ -48,16 +48,25 @@ class TripState {
 
 class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserver {
   StreamSubscription<Position>? _positionStream;
+  StreamSubscription<Map<String, dynamic>?>? _bgStreamSubscription;
   bool _mounted = true;
 
   @override
   TripState build() {
     _mounted = true;
     WidgetsBinding.instance.addObserver(this);
+
+    _bgStreamSubscription = FlutterBackgroundService().on('update').listen((event) {
+      if (_mounted && event != null) {
+        _processBgLocationUpdate(event);
+      }
+    });
+
     ref.onDispose(() {
       _mounted = false;
       WidgetsBinding.instance.removeObserver(this);
       _positionStream?.cancel();
+      _bgStreamSubscription?.cancel();
     });
     
     // Attempt starting global stream immediately when initialized
@@ -128,9 +137,62 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
     state = state.copyWith(status: TripStatus.tracking, activeTrip: newTrip);
 
     LogService.info("Starting trip with title: ${tripTitle != null ? '[TRIP_TITLE_SET]' : 'UNSET'}, car: ${carDetails != null ? '[CAR_NAME_SET]' : 'UNSET'}");
-    _startLocationStream(LocationAccuracy.bestForNavigation);
-
+    _positionStream?.cancel(); // Kill local stream since BackgroundEngine tracks now
+    
     return null; // success
+  }
+
+  void _processBgLocationUpdate(Map<String, dynamic> data) {
+    if (state.status != TripStatus.tracking) return;
+
+    final lat = data['latitude'] as double;
+    final lon = data['longitude'] as double;
+    final speed = data['speed'] as double;
+    final accuracy = data['accuracy'] as double;
+    final timestampStr = data['timestamp'] as String;
+    
+    final currentSpeed = speed * 3.6; // convert m/s to km/h
+
+    if (accuracy > 30.0) {
+      LogService.warn("Point Ignored (Accuracy too low): $accuracy");
+      return;
+    }
+
+    final point = LocationPoint(
+      latitude: lat,
+      longitude: lon,
+      timestamp: DateTime.parse(timestampStr),
+    );
+    
+    final trip = state.activeTrip!; 
+    
+    double addedDistance = 0.0;
+    if (trip.routePoints.isNotEmpty) {
+      final lastPoint = trip.routePoints.last;
+      addedDistance = Geolocator.distanceBetween(
+        lastPoint.latitude, lastPoint.longitude,
+        point.latitude, point.longitude,
+      );
+    }
+    
+    final isJitter = trip.routePoints.isNotEmpty && (addedDistance < 2.0);
+
+    if (!isJitter) {
+      trip.routePoints = List.from(trip.routePoints)..add(point);
+      trip.totalDistance += addedDistance;
+    }
+    
+    if (currentSpeed > trip.maxSpeed) {
+      trip.maxSpeed = currentSpeed;
+    }
+
+    state = TripState(
+      status: state.status,
+      activeTrip: trip,
+      currentSpeed: currentSpeed,
+      latestLat: lat,
+      latestLon: lon,
+    );
   }
 
   void _processLocationUpdate(Position position) {
@@ -206,7 +268,6 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
   }
 
   Future<void> endTrip() async {
-    _positionStream?.cancel();
     BackgroundService.stop();
 
     if (state.activeTrip != null) {

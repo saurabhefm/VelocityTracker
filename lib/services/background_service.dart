@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:flutter_background_service_android/flutter_background_service_android.dart';
-import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:geolocator/geolocator.dart';
 import 'log_service.dart';
 
 class BackgroundService {
@@ -14,7 +14,6 @@ class BackgroundService {
         onStart: onStart,
         autoStart: false,
         isForegroundMode: true,
-        foregroundServiceTypes: [AndroidForegroundType.location],
       ),
       iosConfiguration: IosConfiguration(
         autoStart: false,
@@ -35,8 +34,13 @@ class BackgroundService {
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
-  await LogService.initialize(isBackground: true);
-  LogService.info("Background Service Initialized");
+  
+  try {
+    await LogService.initialize(isBackground: true);
+    LogService.info("[BG_SERVICE] Background Engine Started Successfully");
+  } catch (e) {
+    debugPrint("[BG_SERVICE] Failed to initialize logs: $e");
+  }
 
   if (service is AndroidServiceInstance) {
     service.on('setAsForeground').listen((event) {
@@ -48,7 +52,7 @@ void onStart(ServiceInstance service) async {
   }
 
   service.on('stopService').listen((event) {
-    LogService.info("Service Stopped manually");
+    LogService.info("[BG_SERVICE] Service Stopped manually");
     service.stopSelf();
   });
 
@@ -56,10 +60,44 @@ void onStart(ServiceInstance service) async {
     if (service is AndroidServiceInstance) {
       if (await service.isForegroundService()) {
         service.setForegroundNotificationInfo(
-          title: "VelocityLog",
-          content: "Active Trip Tracking",
+          title: "VelocityLog Tracking",
+          content: "Active Trip Route",
         );
       }
     }
   });
+
+  _startGeolocatorStream(service);
+}
+
+void _startGeolocatorStream(ServiceInstance service) {
+  StreamSubscription<Position>? positionStream;
+
+  void connect() {
+    LogService.info("[BG_SERVICE] Initializing Geolocator Stream");
+    positionStream?.cancel();
+    positionStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 0,
+      ),
+    ).listen((Position position) {
+      service.invoke('update', {
+        'latitude': position.latitude,
+        'longitude': position.longitude,
+        'speed': position.speed,
+        'accuracy': position.accuracy,
+        'timestamp': position.timestamp.toIso8601String(),
+      });
+    }, onError: (error) {
+      LogService.error("[BG_SERVICE] Stream Error: $error");
+      positionStream?.cancel();
+      Future.delayed(const Duration(seconds: 5), () {
+        LogService.info("[BG_SERVICE] Attempting Stream Reconnection...");
+        connect();
+      });
+    });
+  }
+
+  connect();
 }
