@@ -122,6 +122,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 8),
+              IconButton(
+                icon: const Icon(Icons.sync, color: Colors.grey),
+                onPressed: () {
+                  ref.read(tripTrackingProvider.notifier).syncCurrentLocation();
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Syncing real-time constraints..."), duration: Duration(seconds: 1)));
+                },
+                tooltip: "Force Metric Sync",
+              ),
+              const SizedBox(height: 8),
               _buildControls(tripState.status),
               Expanded(
                 child: Padding(
@@ -188,6 +198,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildSpeedometer(double speed) {
+    bool isStopped = speed < 0.1;
+    final displaySpeed = isStopped ? 0.0 : speed;
+
     return SizedBox(
       key: const ValueKey('analog'),
       height: 240,
@@ -203,9 +216,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ],
             pointers: <GaugePointer>[
               NeedlePointer(
-                value: speed, 
-                enableAnimation: true, 
-                animationDuration: 300,
+                value: displaySpeed, 
+                enableAnimation: !isStopped, 
+                animationDuration: isStopped ? 1 : 300,
                 animationType: AnimationType.easeOutBack,  
                 needleColor: Colors.white, 
                 knobStyle: const KnobStyle(color: Color(0xFF38BDF8))
@@ -239,13 +252,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildDigitalSpeedometer(double speed) {
+    bool isStopped = speed < 0.1;
+    final displaySpeed = isStopped ? 0.0 : speed;
+
     return Container(
       height: 240,
       key: const ValueKey('digital'),
       alignment: Alignment.center,
       child: TweenAnimationBuilder<double>(
-        tween: Tween<double>(begin: 0, end: speed),
-        duration: const Duration(milliseconds: 300),
+        tween: Tween<double>(begin: 0, end: displaySpeed),
+        duration: Duration(milliseconds: isStopped ? 1 : 300),
         builder: (context, val, child) {
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
