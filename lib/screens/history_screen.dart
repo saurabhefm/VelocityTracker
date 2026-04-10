@@ -35,13 +35,13 @@ class HistoryScreen extends ConsumerWidget {
               itemCount: trips.length,
               itemBuilder: (context, index) {
                 final trip = trips[index];
-                return _buildTripCard(context, trip);
+                return _buildTripCard(context, ref, trip);
               },
             ),
     );
   }
 
-  Widget _buildTripCard(BuildContext context, TripModel trip) {
+  Widget _buildTripCard(BuildContext context, WidgetRef ref, TripModel trip) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       color: const Color(0xFF2E3B4E),
@@ -60,26 +60,52 @@ class HistoryScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        trip.tripTitle?.isNotEmpty == true ? trip.tripTitle! : Formatters.formatDate(trip.startTime),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (trip.tripTitle?.isNotEmpty == true)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
-                          child: Text(
-                            Formatters.formatDate(trip.startTime),
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          trip.tripTitle?.isNotEmpty == true ? trip.tripTitle! : Formatters.formatDate(trip.startTime),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                        if (trip.tripTitle?.isNotEmpty == true)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text(
+                              Formatters.formatDate(trip.startTime),
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, color: Colors.grey),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _showEditDialog(context, ref, trip);
+                      } else if (value == 'delete') {
+                        _showDeleteDialog(context, ref, trip);
+                      }
+                    },
+                    itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                      const PopupMenuItem<String>(
+                        value: 'edit',
+                        child: Text('Edit Details'),
+                      ),
+                      const PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Text('Delete Trip', style: TextStyle(color: Colors.red)),
+                      ),
                     ],
                   ),
-                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
               const SizedBox(height: 16),
               FittedBox(
                 child: Row(
@@ -97,6 +123,92 @@ class HistoryScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _showEditDialog(BuildContext context, WidgetRef ref, TripModel trip) {
+    final titleController = TextEditingController(text: trip.tripTitle ?? '');
+    final carController = TextEditingController(text: trip.carDetails ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          title: const Text('Edit Trip Details', style: TextStyle(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Trip Title',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF38BDF8))),
+                ),
+                style: const TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: carController,
+                decoration: const InputDecoration(
+                  labelText: 'Car Details',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF38BDF8))),
+                ),
+                style: const TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                trip.tripTitle = titleController.text;
+                trip.carDetails = carController.text;
+                trip.save(); // hive
+                ref.invalidate(tripHistoryProvider); // refresh view
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8)),
+              child: const Text('Save', style: TextStyle(color: Colors.black)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteDialog(BuildContext context, WidgetRef ref, TripModel trip) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          title: const Text('Delete Trip', style: TextStyle(color: Colors.white)),
+          content: const Text('Are you sure you want to delete this trip record?', style: TextStyle(color: Colors.grey)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                trip.delete(); // hive delete
+                ref.invalidate(tripHistoryProvider);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
     );
   }
 }
