@@ -165,10 +165,17 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
 
   Future<void> syncCurrentLocation() async {
     try {
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      final speed = pos.speed * 3.6;
-      state = state.copyWith(
-        currentSpeed: speed < 0.1 ? 0.0 : speed,
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
+      double speed = pos.speed * 3.6;
+      
+      // Floor filter
+      if (speed < 0.8) speed = 0.0;
+
+      // Force completely new state block for rigorous UI flushing
+      state = TripState(
+        status: state.status,
+        activeTrip: state.activeTrip,
+        currentSpeed: speed,
         latestLat: pos.latitude,
         latestLon: pos.longitude,
       );
@@ -186,7 +193,12 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
     final accuracy = data['accuracy'] as double;
     final timestampStr = data['timestamp'] as String;
     
-    final currentSpeed = speed * 3.6; // convert m/s to km/h
+    double currentSpeed = speed * 3.6; // convert m/s to km/h
+    
+    // Noise Filter: Deadzone for tiny drifts while idling
+    if (currentSpeed < 0.8) {
+      currentSpeed = 0.0;
+    }
 
     if (accuracy > 30.0) {
       LogService.warn("Point Ignored (Accuracy too low): $accuracy");
@@ -200,6 +212,16 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
     );
     
     final trip = state.activeTrip!; 
+    
+    // Distance / Spike Integrity
+    if (trip.routePoints.isNotEmpty) {
+      final lastPoint = trip.routePoints.last;
+      final timeDiffMs = point.timestamp.difference(lastPoint.timestamp).inMilliseconds;
+      if (timeDiffMs <= 1500 && state.currentSpeed < 1.0 && currentSpeed > 100.0) {
+        LogService.warn("GPS Jitter Guard: Impossible >100km/h spike from 0 bypassed. Ignored.");
+        return; 
+      }
+    }
     
     double addedDistance = 0.0;
     if (trip.routePoints.isNotEmpty) {
@@ -227,7 +249,11 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
   }
 
   void _processLocationUpdate(Position position) {
-    final currentSpeed = position.speed * 3.6; // convert m/s to km/h
+    double currentSpeed = position.speed * 3.6; // convert m/s to km/h
+    
+    if (currentSpeed < 0.8) {
+      currentSpeed = 0.0;
+    }
 
     if (state.activeTrip == null || state.status != TripStatus.tracking) {
       state = state.copyWith(
