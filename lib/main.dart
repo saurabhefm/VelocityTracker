@@ -5,11 +5,14 @@ import 'services/storage_service.dart';
 import 'services/background_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/history_screen.dart';
+import 'services/auth_service.dart';
+import 'screens/pin_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.init();
   await BackgroundService.initialize();
+  await AuthService.init();
   runApp(const ProviderScope(child: VelocityLogApp()));
 }
 
@@ -31,7 +34,7 @@ class VelocityLogApp extends StatelessWidget {
         textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
         useMaterial3: true,
       ),
-      home: const MainNavigationScreen(),
+      home: const PinScreen(),
     );
   }
 }
