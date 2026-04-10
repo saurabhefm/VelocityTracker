@@ -49,6 +49,7 @@ dependencies:
   latlong2: ^0.9.1
   flutter_map_location_marker: ^10.2.0
   flutter_secure_storage: ^10.0.0
+  share_plus: ^12.0.2
 
 dev_dependencies:
   flutter_test:

@@ -181,7 +181,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget _buildSpeedometer(double speed) {
     return SizedBox(
       key: const ValueKey('analog'),
-      height: 300,
+      height: 240,
       child: SfRadialGauge(
         axes: <RadialAxis>[
           RadialAxis(
@@ -205,7 +205,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               GaugeAnnotation(
                 widget: Text(
                   Formatters.formatSpeed(speed),
-                  style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
                   semanticsLabel: "Current Speed: ${Formatters.formatSpeed(speed)} kilometers per hour",
                 ),
                 angle: 90,
@@ -230,7 +230,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildDigitalSpeedometer(double speed) {
     return Container(
-      height: 300,
+      height: 240,
       key: const ValueKey('digital'),
       alignment: Alignment.center,
       child: Column(
@@ -238,7 +238,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         children: [
           Text(
             Formatters.formatSpeed(speed),
-            style: const TextStyle(fontSize: 100, fontWeight: FontWeight.w900, color: Colors.white, height: 1.0, letterSpacing: -2.0),
+            style: const TextStyle(fontSize: 80, fontWeight: FontWeight.w900, color: Colors.white, height: 1.0, letterSpacing: -2.0),
           ),
           const SizedBox(height: 10),
           const Text(
@@ -252,7 +252,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildStatCard(String title, String value, IconData icon) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
         color: const Color(0xFF1E293B).withOpacity(0.5),
         borderRadius: BorderRadius.circular(24),
@@ -260,11 +260,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ),
       child: Column(
         children: [
-          Icon(icon, color: const Color(0xFF38BDF8), size: 28),
-          const SizedBox(height: 12),
-          Text(title, style: const TextStyle(color: Colors.grey, fontSize: 13, letterSpacing: 1.1)),
-          const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          Icon(icon, color: const Color(0xFF38BDF8), size: 24),
+          const SizedBox(height: 8),
+          Text(title, style: const TextStyle(color: Colors.grey, fontSize: 11, letterSpacing: 1.1)),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         ],
       ),
     );

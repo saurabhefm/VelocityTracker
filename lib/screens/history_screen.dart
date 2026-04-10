@@ -60,16 +60,26 @@ class HistoryScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    Formatters.formatDate(trip.startTime),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        trip.tripTitle?.isNotEmpty == true ? trip.tripTitle! : Formatters.formatDate(trip.startTime),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (trip.tripTitle?.isNotEmpty == true)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            Formatters.formatDate(trip.startTime),
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ),
+                    ],
                   ),
                   const Icon(Icons.chevron_right, color: Colors.grey),
-                ],
-              ),
               const SizedBox(height: 16),
               FittedBox(
                 child: Row(

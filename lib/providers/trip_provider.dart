@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:ui';
+import 'package:flutter/widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -42,12 +44,59 @@ class TripState {
   }
 }
 
-class TripTrackingNotifier extends Notifier<TripState> {
+class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserver {
   StreamSubscription<Position>? _positionStream;
+  bool _mounted = true;
 
   @override
   TripState build() {
+    _mounted = true;
+    WidgetsBinding.instance.addObserver(this);
+    ref.onDispose(() {
+      _mounted = false;
+      WidgetsBinding.instance.removeObserver(this);
+      _positionStream?.cancel();
+    });
+    
+    // Attempt starting global stream immediately when initialized
+    _startLocationStream(LocationAccuracy.medium);
+
     return TripState(status: TripStatus.idle);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState appState) {
+    if (state.status == TripStatus.tracking) return; // Do not interrupt if a trip is active
+
+    if (appState == AppLifecycleState.resumed) {
+      _startLocationStream(LocationAccuracy.medium);
+    } else if (appState == AppLifecycleState.paused || appState == AppLifecycleState.hidden) {
+      _positionStream?.cancel();
+      _positionStream = null;
+      state = state.copyWith(currentSpeed: 0.0);
+    }
+  }
+
+
+
+  void _startLocationStream(LocationAccuracy accuracy) async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+    
+    var inUseStatus = await Permission.locationWhenInUse.status;
+    if (!inUseStatus.isGranted) return; // Do not ask for permissions here, just silently fail global stream until user clicks start
+    
+    _positionStream?.cancel();
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: accuracy,
+        distanceFilter: 0,
+      ),
+    ).listen((Position position) {
+      if (_mounted) {
+        _processLocationUpdate(position);
+      }
+    });
   }
 
   Future<String?> startTrip({String? tripTitle, String? carDetails}) async {
@@ -75,20 +124,22 @@ class TripTrackingNotifier extends Notifier<TripState> {
 
     state = state.copyWith(status: TripStatus.tracking, activeTrip: newTrip);
 
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 0,
-      ),
-    ).listen((Position position) {
-      _processLocationUpdate(position);
-    });
+    _startLocationStream(LocationAccuracy.bestForNavigation);
 
     return null; // success
   }
 
   void _processLocationUpdate(Position position) {
-    if (state.activeTrip == null) return;
+    final currentSpeed = position.speed * 3.6; // convert m/s to km/h
+
+    if (state.activeTrip == null || state.status != TripStatus.tracking) {
+      state = state.copyWith(
+        currentSpeed: currentSpeed,
+        latestLat: position.latitude,
+        latestLon: position.longitude,
+      );
+      return;
+    }
     
     // Ignore updates with low accuracy (> 30 meters)
     if (position.accuracy > 30.0) {
@@ -104,7 +155,6 @@ class TripTrackingNotifier extends Notifier<TripState> {
       timestamp: position.timestamp,
     );
     
-    final currentSpeed = position.speed * 3.6; // convert m/s to km/h
     final trip = state.activeTrip!; // Riverpod notifies listeners if state is changed via copyWith, 
                                     // but we also mutate the object because of Hive reference.
     
@@ -141,7 +191,7 @@ class TripTrackingNotifier extends Notifier<TripState> {
 
   Future<void> pauseTrip() async {
     _positionStream?.pause();
-    state = state.copyWith(status: TripStatus.paused);
+    state = state.copyWith(status: TripStatus.paused, currentSpeed: 0.0);
   }
 
   Future<void> resumeTrip() async {
@@ -167,6 +217,7 @@ class TripTrackingNotifier extends Notifier<TripState> {
       ref.invalidate(tripHistoryProvider);
     }
     state = TripState(status: TripStatus.idle);
+    _startLocationStream(LocationAccuracy.medium);
   }
 }
 
