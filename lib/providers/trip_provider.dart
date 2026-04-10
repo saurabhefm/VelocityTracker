@@ -95,8 +95,8 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return;
     
-    var inUseStatus = await Permission.locationWhenInUse.status;
-    if (!inUseStatus.isGranted) return; // Do not ask for permissions here, just silently fail global stream until user clicks start
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return; // Silently fail global stream until user clicks start
     
     _positionStream?.cancel();
     _positionStream = Geolocator.getPositionStream(
@@ -115,14 +115,13 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return "Location services are disabled. Please enable them.";
 
-    var inUseStatus = await Permission.locationWhenInUse.request();
-    if (inUseStatus.isDenied || inUseStatus.isPermanentlyDenied) {
-       return "Location permissions are denied.";
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
     }
-
-    var alwaysStatus = await Permission.locationAlways.status;
-    if (!alwaysStatus.isGranted) {
-       await Permission.locationAlways.request();
+    
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      return "Location permissions are denied.";
     }
 
     BackgroundService.start();
