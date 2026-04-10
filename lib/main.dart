@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/storage_service.dart';
 import 'services/background_service.dart';
+import 'services/log_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/history_screen.dart';
 import 'services/auth_service.dart';
@@ -10,6 +11,7 @@ import 'screens/pin_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await LogService.initialize(isBackground: false);
   await StorageService.init();
   await BackgroundService.initialize();
   await AuthService.init();

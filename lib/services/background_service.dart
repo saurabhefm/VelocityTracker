@@ -3,6 +3,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'log_service.dart';
 
 class BackgroundService {
   static Future<void> initialize() async {
@@ -34,6 +35,8 @@ class BackgroundService {
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
+  await LogService.initialize(isBackground: true);
+  LogService.info("Background Service Initialized");
 
   if (service is AndroidServiceInstance) {
     service.on('setAsForeground').listen((event) {
@@ -45,6 +48,7 @@ void onStart(ServiceInstance service) async {
   }
 
   service.on('stopService').listen((event) {
+    LogService.info("Service Stopped manually");
     service.stopSelf();
   });
 

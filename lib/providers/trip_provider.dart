@@ -9,7 +9,9 @@ import '../models/trip_model.dart';
 import '../models/enums.dart';
 import '../models/location_point.dart';
 import '../services/storage_service.dart';
+import '../services/storage_service.dart';
 import '../services/background_service.dart';
+import '../services/log_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class TripState {
@@ -66,6 +68,7 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState appState) {
+    LogService.info('App Lifecycle State changed: $appState');
     if (state.status == TripStatus.tracking) return; // Do not interrupt if a trip is active
 
     if (appState == AppLifecycleState.resumed) {
@@ -124,6 +127,7 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
 
     state = state.copyWith(status: TripStatus.tracking, activeTrip: newTrip);
 
+    LogService.info("Starting trip with title: ${tripTitle != null ? '[TRIP_TITLE_SET]' : 'UNSET'}, car: ${carDetails != null ? '[CAR_NAME_SET]' : 'UNSET'}");
     _startLocationStream(LocationAccuracy.bestForNavigation);
 
     return null; // success
@@ -143,11 +147,11 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
     
     // Ignore updates with low accuracy (> 30 meters)
     if (position.accuracy > 30.0) {
-      debugPrint("Point Ignored (Accuracy too low): ${position.accuracy}");
+      LogService.warn("Point Ignored (Accuracy too low): ${position.accuracy}");
       return;
     }
     
-    debugPrint("Point Captured: ${position.latitude}, ${position.longitude}");
+
 
     final point = LocationPoint(
       latitude: position.latitude,
@@ -190,11 +194,13 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
   }
 
   Future<void> pauseTrip() async {
+    LogService.info("Trip paused manually");
     _positionStream?.pause();
     state = state.copyWith(status: TripStatus.paused, currentSpeed: 0.0);
   }
 
   Future<void> resumeTrip() async {
+    LogService.info("Trip resumed manually");
     _positionStream?.resume();
     state = state.copyWith(status: TripStatus.tracking);
   }
@@ -211,7 +217,10 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
       await StorageService.saveTrip(trip);
       try {
         trip.save(); // Also call native HiveObject save explicitly
-      } catch (_) {}
+        LogService.info('Hive save successful for trip: ${trip.id}');
+      } catch (e, stack) {
+        LogService.error('Hive save failed for trip: ${trip.id}', e, stack);
+      }
       
       // Refresh history by invalidating provider
       ref.invalidate(tripHistoryProvider);
