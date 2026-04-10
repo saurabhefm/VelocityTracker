@@ -2,12 +2,12 @@ import 'package:intl/intl.dart';
 
 class Formatters {
   static String formatSpeed(double speed) {
-    return speed.toStringAsFixed(1);
+    return speed.toStringAsFixed(2);
   }
 
   static String formatDistance(double meters) {
     if (meters < 1000) {
-      return "${meters.toStringAsFixed(0)} m";
+      return "${meters.toStringAsFixed(2)} m";
     }
     return "${(meters / 1000).toStringAsFixed(2)} km";
   }

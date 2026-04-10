@@ -11,6 +11,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -91,14 +92,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                transitionBuilder: (Widget child, Animation<double> animation) {
-                  return FadeTransition(opacity: animation, child: ScaleTransition(scale: animation, child: child));
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    isAnalogView = !isAnalogView;
+                  });
                 },
-                child: isAnalogView 
-                    ? _buildSpeedometer(tripState.currentSpeed)
-                    : _buildDigitalSpeedometer(tripState.currentSpeed),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  transitionBuilder: (Widget child, Animation<double> animation) {
+                    return FadeTransition(opacity: animation, child: ScaleTransition(scale: animation, child: child));
+                  },
+                  child: isAnalogView 
+                      ? _buildSpeedometer(tripState.currentSpeed)
+                      : _buildDigitalSpeedometer(tripState.currentSpeed),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -238,7 +246,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         children: [
           Text(
             Formatters.formatSpeed(speed),
-            style: const TextStyle(fontSize: 80, fontWeight: FontWeight.w900, color: Colors.white, height: 1.0, letterSpacing: -2.0),
+            style: GoogleFonts.orbitron(
+              textStyle: const TextStyle(fontSize: 80, fontWeight: FontWeight.w900, color: Colors.white, height: 1.0, letterSpacing: -2.0)
+            ),
           ),
           const SizedBox(height: 10),
           const Text(
