@@ -78,7 +78,7 @@ void _startGeolocatorStream(ServiceInstance service) {
     positionStream?.cancel();
     positionStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
+        accuracy: LocationAccuracy.high,
         distanceFilter: 0,
       ),
     ).listen((Position position) {

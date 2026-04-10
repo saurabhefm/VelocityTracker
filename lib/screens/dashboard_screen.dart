@@ -137,10 +137,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildLiveMap(BuildContext context, {required bool isTracking}) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
+    return RepaintBoundary(
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white10),
       ),
@@ -183,7 +184,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 
   Widget _buildSpeedometer(double speed) {
@@ -204,6 +205,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               NeedlePointer(
                 value: speed, 
                 enableAnimation: true, 
+                animationDuration: 300,
                 animationType: AnimationType.easeOutBack,  
                 needleColor: Colors.white, 
                 knobStyle: const KnobStyle(color: Color(0xFF38BDF8))
@@ -241,21 +243,27 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       height: 240,
       key: const ValueKey('digital'),
       alignment: Alignment.center,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            Formatters.formatSpeed(speed),
-            style: GoogleFonts.orbitron(
-              textStyle: const TextStyle(fontSize: 80, fontWeight: FontWeight.w900, color: Colors.white, height: 1.0, letterSpacing: -2.0)
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'km/h',
-            style: TextStyle(fontSize: 24, color: Colors.grey, fontWeight: FontWeight.w600, letterSpacing: 2.0),
-          ),
-        ],
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0, end: speed),
+        duration: const Duration(milliseconds: 300),
+        builder: (context, val, child) {
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                Formatters.formatSpeed(val),
+                style: GoogleFonts.orbitron(
+                  textStyle: const TextStyle(fontSize: 80, fontWeight: FontWeight.w900, color: Colors.white, height: 1.0, letterSpacing: -2.0)
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'km/h',
+                style: TextStyle(fontSize: 24, color: Colors.grey, fontWeight: FontWeight.w600, letterSpacing: 2.0),
+              ),
+            ],
+          );
+        }
       ),
     );
   }

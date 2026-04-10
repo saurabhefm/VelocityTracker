@@ -70,7 +70,7 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
     });
     
     // Attempt starting global stream immediately when initialized
-    _startLocationStream(LocationAccuracy.medium);
+    _startLocationStream(LocationAccuracy.high);
 
     return TripState(status: TripStatus.idle);
   }
@@ -81,7 +81,7 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
     if (state.status == TripStatus.tracking) return; // Do not interrupt if a trip is active
 
     if (appState == AppLifecycleState.resumed) {
-      _startLocationStream(LocationAccuracy.medium);
+      _startLocationStream(LocationAccuracy.high);
     } else if (appState == AppLifecycleState.paused || appState == AppLifecycleState.hidden) {
       _positionStream?.cancel();
       _positionStream = null;
@@ -174,13 +174,9 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
         point.latitude, point.longitude,
       );
     }
-    
-    final isJitter = trip.routePoints.isNotEmpty && (addedDistance < 2.0);
 
-    if (!isJitter) {
-      trip.routePoints = List.from(trip.routePoints)..add(point);
-      trip.totalDistance += addedDistance;
-    }
+    trip.routePoints = List.from(trip.routePoints)..add(point);
+    trip.totalDistance += addedDistance;
     
     if (currentSpeed > trip.maxSpeed) {
       trip.maxSpeed = currentSpeed;
@@ -287,7 +283,7 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
       ref.invalidate(tripHistoryProvider);
     }
     state = TripState(status: TripStatus.idle);
-    _startLocationStream(LocationAccuracy.medium);
+    _startLocationStream(LocationAccuracy.high);
   }
 }
 
