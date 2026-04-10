@@ -10,6 +10,7 @@ import 'trip_details_screen.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:intl/intl.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -52,7 +53,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('VelocityLog', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF38BDF8))),
+        title: const Text('VelocityTracker', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF38BDF8))),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
@@ -84,43 +85,43 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           )
         ],
       ),
-      body: SingleChildScrollView(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  transitionBuilder: (Widget child, Animation<double> animation) {
-                    return FadeTransition(opacity: animation, child: ScaleTransition(scale: animation, child: child));
-                  },
-                  child: isAnalogView 
-                      ? _buildSpeedometer(tripState.currentSpeed)
-                      : _buildDigitalSpeedometer(tripState.currentSpeed),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  return FadeTransition(opacity: animation, child: ScaleTransition(scale: animation, child: child));
+                },
+                child: isAnalogView 
+                    ? _buildSpeedometer(tripState.currentSpeed)
+                    : _buildDigitalSpeedometer(tripState.currentSpeed),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard("Distance", Formatters.formatDistance(tripState.activeTrip?.totalDistance ?? 0.0), Icons.straighten),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildStatCard("Duration", durationText, Icons.timer),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 30),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatCard("Distance", Formatters.formatDistance(tripState.activeTrip?.totalDistance ?? 0.0), Icons.straighten),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildStatCard("Duration", durationText, Icons.timer),
-                      ),
-                    ],
-                  ),
+              ),
+              _buildControls(tripState.status),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 20),
+                  child: _buildLiveMap(context, isTracking: tripState.status == TripStatus.tracking),
                 ),
-                const SizedBox(height: 30),
-                _buildLiveMap(context, isTracking: tripState.status == TripStatus.tracking),
-                const SizedBox(height: 30),
-                _buildControls(tripState.status),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -129,7 +130,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildLiveMap(BuildContext context, {required bool isTracking}) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.4,
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
@@ -272,22 +272,34 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildControls(TripStatus status) {
     if (status == TripStatus.idle) {
-      return ElevatedButton(
-        onPressed: () async {
-          final error = await ref.read(tripTrackingProvider.notifier).startTrip();
-          if (error != null && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
-          }
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF38BDF8),
-          foregroundColor: Colors.black,
-          padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 18),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-          elevation: 8,
-          shadowColor: const Color(0xFF38BDF8).withOpacity(0.5)
-        ),
-        child: const Text('START JOURNEY', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 1.5)),
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          ElevatedButton(
+            onPressed: () => _showStartTripSheet(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF38BDF8),
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 18),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              elevation: 8,
+              shadowColor: const Color(0xFF38BDF8).withOpacity(0.5)
+            ),
+            child: const Text('START JOURNEY', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 1.5)),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white10),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.settings, color: Color(0xFF38BDF8)),
+              onPressed: () => _showStartTripSheet(context),
+            ),
+          ),
+        ],
       );
     } else {
       return Row(
@@ -328,5 +340,80 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ],
       );
     }
+  }
+  void _showStartTripSheet(BuildContext context) {
+    final defaultTitle = DateFormat('MMM dd, yyyy - hh:mm a').format(DateTime.now());
+    final titleController = TextEditingController(text: defaultTitle);
+    final carController = TextEditingController(text: "Primary Vehicle");
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Trip Details', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 20),
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Trip Title',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF38BDF8))),
+                ),
+                style: const TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: carController,
+                decoration: const InputDecoration(
+                  labelText: 'Car Details',
+                  labelStyle: TextStyle(color: Colors.grey),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF38BDF8))),
+                ),
+                style: const TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    final error = await ref.read(tripTrackingProvider.notifier).startTrip(
+                      tripTitle: titleController.text,
+                      carDetails: carController.text,
+                    );
+                    if (error != null && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error), backgroundColor: Colors.red));
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF38BDF8),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('Quick Start', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
