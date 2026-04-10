@@ -50,7 +50,7 @@ class TripTrackingNotifier extends Notifier<TripState> {
     return TripState(status: TripStatus.idle);
   }
 
-  Future<String?> startTrip() async {
+  Future<String?> startTrip({String? tripTitle, String? carDetails}) async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) return "Location services are disabled. Please enable them.";
 
@@ -69,6 +69,8 @@ class TripTrackingNotifier extends Notifier<TripState> {
     final newTrip = TripModel(
       id: const Uuid().v4(),
       startTime: DateTime.now(),
+      tripTitle: tripTitle,
+      carDetails: carDetails,
     );
 
     state = state.copyWith(status: TripStatus.tracking, activeTrip: newTrip);
