@@ -23,6 +23,7 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Timer? _timer;
   bool isAnalogView = true;
+  bool isNavigationMode = false;
   final MapController _mapController = MapController();
 
   @override
@@ -46,6 +47,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final tripState = ref.watch(tripTrackingProvider);
     final bool isIdle = tripState.status == TripStatus.idle;
+
+    ref.listen(tripTrackingProvider, (previous, next) {
+      if (isNavigationMode && next.latestHeading != previous?.latestHeading) {
+        _mapController.rotate(-next.latestHeading);
+      }
+    });
 
     String durationText = "00:00:00";
     if (tripState.activeTrip != null) {
@@ -75,6 +82,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
               PopupMenuItem<String>(
+                value: 'toggle_navigation',
+                child: Text(isNavigationMode ? 'Turn Off Navigation Mode' : 'Turn On Navigation Mode'),
+              ),
+              PopupMenuItem<String>(
                 value: 'toggle_view',
                 child: Text(isAnalogView ? 'Switch to Digital View' : 'Switch to Analog View'),
               ),
@@ -92,6 +103,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
+              if (tripState.isOverSpeedLimit)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    "SPEED LIMIT EXCEEDED!",
+                    style: GoogleFonts.outfit(
+                      textStyle: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, letterSpacing: 2.0)
+                    ),
+                  ),
+                ),
               GestureDetector(
                 onTap: () {
                   setState(() {
@@ -161,8 +182,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             borderRadius: BorderRadius.circular(24),
             child: FlutterMap(
               mapController: _mapController,
-              options: const MapOptions(
+              options: MapOptions(
                 initialZoom: 16.0,
+                onMapReady: () {
+                  if (isNavigationMode) {
+                    _mapController.move(_mapController.camera.center, 18.0);
+                  }
+                },
               ),
               children: [
                 TileLayer(
@@ -170,26 +196,46 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   userAgentPackageName: 'com.example.velocity_log_app',
                 ),
                 CurrentLocationLayer(
-                  alignPositionOnUpdate: isTracking ? AlignOnUpdate.always : AlignOnUpdate.never,
-                  alignDirectionOnUpdate: isTracking ? AlignOnUpdate.always : AlignOnUpdate.never,
+                  alignPositionOnUpdate: (isTracking || isNavigationMode) ? AlignOnUpdate.always : AlignOnUpdate.never,
+                  alignDirectionOnUpdate: (isTracking || isNavigationMode) ? AlignOnUpdate.always : AlignOnUpdate.never,
                 ),
               ],
             ),
           ),
           Positioned(
-            bottom: 12,
+            top: 12,
             right: 12,
-            child: FloatingActionButton.small(
-              heroTag: 'locate_me_fab',
-              backgroundColor: const Color(0xFF1E293B),
-              onPressed: () {
-                final lat = ref.read(tripTrackingProvider).latestLat;
-                final lon = ref.read(tripTrackingProvider).latestLon;
-                if (lat != 0.0 && lon != 0.0) {
-                  _mapController.move(LatLng(lat, lon), 16.0);
-                }
-              },
-              child: const Icon(Icons.my_location, color: Color(0xFF38BDF8)),
+            child: Column(
+              children: [
+                FloatingActionButton.small(
+                  heroTag: 'nav_mode_fab',
+                  backgroundColor: isNavigationMode ? const Color(0xFF38BDF8) : const Color(0xFF1E293B),
+                  onPressed: () {
+                    setState(() {
+                      isNavigationMode = !isNavigationMode;
+                      if (!isNavigationMode) {
+                        _mapController.rotate(0);
+                      } else {
+                        _mapController.move(_mapController.camera.center, 18.0);
+                      }
+                    });
+                  },
+                  child: Icon(isNavigationMode ? Icons.explore : Icons.explore_off, color: isNavigationMode ? Colors.black : Colors.white),
+                ),
+                const SizedBox(height: 8),
+                FloatingActionButton.small(
+                  heroTag: 'locate_me_fab',
+                  backgroundColor: const Color(0xFF1E293B),
+                  onPressed: () {
+                    final lat = ref.read(tripTrackingProvider).latestLat;
+                    final lon = ref.read(tripTrackingProvider).latestLon;
+                    if (lat != 0.0 && lon != 0.0) {
+                      _mapController.move(LatLng(lat, lon), isNavigationMode ? 18.0 : 16.0);
+                    }
+                  },
+                  child: const Icon(Icons.my_location, color: Color(0xFF38BDF8)),
+                ),
+              ],
             ),
           ),
         ],
@@ -197,7 +243,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     ));
   }
 
+  void _updateMapRotation(double heading) {
+    if (isNavigationMode) {
+      _mapController.rotate(-heading);
+    }
+  }
+
   Widget _buildSpeedometer(double speed) {
+    final tripState = ref.read(tripTrackingProvider);
+    final accentColor = tripState.isOverSpeedLimit ? Colors.red : Colors.white;
     bool isStopped = speed < 0.1;
     final displaySpeed = isStopped ? 0.0 : speed;
 
@@ -228,7 +282,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               GaugeAnnotation(
                 widget: Text(
                   Formatters.formatSpeed(speed),
-                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: accentColor),
                   semanticsLabel: "Current Speed: ${Formatters.formatSpeed(speed)} kilometers per hour",
                 ),
                 angle: 90,
@@ -269,7 +323,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               Text(
                 Formatters.formatSpeed(val),
                 style: GoogleFonts.orbitron(
-                  textStyle: const TextStyle(fontSize: 80, fontWeight: FontWeight.w900, color: Colors.white, height: 1.0, letterSpacing: -2.0)
+                  textStyle: TextStyle(fontSize: 80, fontWeight: FontWeight.w900, color: ref.read(tripTrackingProvider).isOverSpeedLimit ? Colors.red : Colors.white, height: 1.0, letterSpacing: -2.0)
                 ),
               ),
               const SizedBox(height: 10),

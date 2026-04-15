@@ -7,12 +7,16 @@ import 'services/log_service.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/history_screen.dart';
 import 'services/auth_service.dart';
+import 'services/settings_service.dart';
+import 'services/notification_service.dart';
 import 'screens/pin_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LogService.initialize(isBackground: false);
   await StorageService.init();
+  await SettingsService.init();
+  await NotificationService.init();
   await BackgroundService.initialize();
   await AuthService.init();
   runApp(const ProviderScope(child: VelocityLogApp()));

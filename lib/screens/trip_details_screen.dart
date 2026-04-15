@@ -7,13 +7,26 @@ import '../models/trip_model.dart';
 import '../utils/formatters.dart';
 import '../providers/trip_provider.dart';
 
-class TripDetailsScreen extends ConsumerWidget {
+import '../models/location_point.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart';
+
+class TripDetailsScreen extends ConsumerStatefulWidget {
   final TripModel trip;
 
   const TripDetailsScreen({super.key, required this.trip});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TripDetailsScreen> createState() => _TripDetailsScreenState();
+}
+
+class _TripDetailsScreenState extends ConsumerState<TripDetailsScreen> {
+  LocationPoint? _selectedPoint;
+  LatLng? _tapCoords;
+
+  @override
+  Widget build(BuildContext context) {
+    final trip = widget.trip;
     final activeTrip = ref.watch(tripTrackingProvider).activeTrip;
     final currentTrip = (activeTrip?.id == trip.id) ? activeTrip! : trip;
 
@@ -118,38 +131,94 @@ class TripDetailsScreen extends ConsumerWidget {
                             ),
                           ),
                         )
-                      : FlutterMap(
-                    options: MapOptions(
-                      initialCenter: initialTarget,
-                      initialZoom: 14.0,
-                    ),
-                    children: [
-                      TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.example.velocity_log_app',
-                      ),
-                      PolylineLayer(
-                        polylines: [
-                          Polyline(
-                            points: points,
-                            color: const Color(0xFF38BDF8),
-                            strokeWidth: 5.0,
-                          )
+                      : Stack(
+                        children: [
+                          FlutterMap(
+                            options: MapOptions(
+                              initialCenter: initialTarget,
+                              initialZoom: 14.0,
+                              onTap: (tapPosition, point) {
+                                final nearest = _findNearestPoint(point, currentTrip.routePoints);
+                                setState(() {
+                                  _selectedPoint = nearest;
+                                  _tapCoords = point;
+                                });
+                              },
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.example.velocity_log_app',
+                              ),
+                              PolylineLayer(
+                                polylines: [
+                                  Polyline(
+                                    points: points,
+                                    color: const Color(0xFF38BDF8),
+                                    strokeWidth: 5.0,
+                                  )
+                                ],
+                              ),
+                              if (points.isNotEmpty)
+                                MarkerLayer(
+                                  markers: [
+                                    Marker(
+                                      point: points.last,
+                                      width: 40,
+                                      height: 40,
+                                      child: const Icon(Icons.location_on, color: Colors.red, size: 40),
+                                    ),
+                                    if (_selectedPoint != null)
+                                      Marker(
+                                        point: LatLng(_selectedPoint!.latitude, _selectedPoint!.longitude),
+                                        width: 12,
+                                        height: 12,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: const Color(0xFF38BDF8), width: 2),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                          if (_selectedPoint != null && _tapCoords != null)
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 20,
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1E293B),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFF38BDF8), width: 1),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 10, spreadRadius: 2),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        "Speed: ${Formatters.formatSpeed(_selectedPoint!.speed)} km/h",
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                      ),
+                                      Text(
+                                        "Time: ${DateFormat('HH:mm:ss').format(_selectedPoint!.timestamp)}",
+                                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
-                      if (points.isNotEmpty)
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: points.last,
-                              width: 40,
-                              height: 40,
-                              child: const Icon(Icons.location_on, color: Colors.red, size: 40),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
                 ),
               ),
             ),
@@ -157,6 +226,28 @@ class TripDetailsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  LocationPoint? _findNearestPoint(LatLng tapCoords, List<LocationPoint> routePoints) {
+    if (routePoints.isEmpty) return null;
+
+    LocationPoint? nearest;
+    double minDistance = double.infinity;
+
+    for (final point in routePoints) {
+      final distance = Geolocator.distanceBetween(
+        tapCoords.latitude, tapCoords.longitude,
+        point.latitude, point.longitude,
+      );
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearest = point;
+      }
+    }
+
+    // Threshold: Only snap if within 50 meters
+    return minDistance < 50.0 ? nearest : null;
   }
 }
 

@@ -20,19 +20,22 @@ class LocationPointAdapter extends TypeAdapter<LocationPoint> {
       latitude: fields[0] as double,
       longitude: fields[1] as double,
       timestamp: fields[2] as DateTime,
+      speed: fields[3] as double,
     );
   }
 
   @override
   void write(BinaryWriter writer, LocationPoint obj) {
     writer
-      ..writeByte(3)
+      ..writeByte(4)
       ..writeByte(0)
       ..write(obj.latitude)
       ..writeByte(1)
       ..write(obj.longitude)
       ..writeByte(2)
-      ..write(obj.timestamp);
+      ..write(obj.timestamp)
+      ..writeByte(3)
+      ..write(obj.speed);
   }
 
   @override

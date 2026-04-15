@@ -13,9 +13,13 @@ class LocationPoint {
   @HiveField(2)
   final DateTime timestamp;
 
+  @HiveField(3)
+  final double speed;
+
   LocationPoint({
     required this.latitude,
     required this.longitude,
     required this.timestamp,
+    this.speed = 0.0,
   });
 }
