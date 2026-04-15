@@ -25,11 +25,20 @@ jobs:
 
       - name: Get Dependencies
         run: |
+          # 1. Standard Flutter dependency sync
           flutter pub get
-          # Navigate to iOS and update pods to match the new SDKs
+          
+          # 2. Force Flutter to download the iOS engine and artifacts
+          flutter precache --ios
+          
+          # 3. Clean and Re-install Pods to fix the 'Module not found' issue
           cd ios
+          # Ensure CocoaPods knows about the iOS 13.0 requirement
           pod repo update
-          pod install
+          # Remove local cache to force a fresh link to plugins
+          rm -rf Pods
+          rm -rf Podfile.lock
+          pod install --repo-update
           cd ..
 
       - name: Build iOS (No Codesign)
