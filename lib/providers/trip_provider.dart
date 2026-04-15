@@ -13,6 +13,10 @@ import '../services/background_service.dart';
 import '../services/log_service.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:vibration/vibration.dart';
+import '../services/settings_service.dart';
+import '../services/notification_service.dart';
 
 class TripState {
   final TripStatus status;
@@ -20,6 +24,8 @@ class TripState {
   final double currentSpeed;
   final double latestLat;
   final double latestLon;
+  final double latestHeading;
+  final bool isOverSpeedLimit;
 
   TripState({
     required this.status,
@@ -27,6 +33,8 @@ class TripState {
     this.currentSpeed = 0.0,
     this.latestLat = 0.0,
     this.latestLon = 0.0,
+    this.latestHeading = 0.0,
+    this.isOverSpeedLimit = false,
   });
 
   TripState copyWith({
@@ -35,6 +43,8 @@ class TripState {
     double? currentSpeed,
     double? latestLat,
     double? latestLon,
+    double? latestHeading,
+    bool? isOverSpeedLimit,
   }) {
     return TripState(
       status: status ?? this.status,
@@ -42,6 +52,8 @@ class TripState {
       currentSpeed: currentSpeed ?? this.currentSpeed,
       latestLat: latestLat ?? this.latestLat,
       latestLon: latestLon ?? this.latestLon,
+      latestHeading: latestHeading ?? this.latestHeading,
+      isOverSpeedLimit: isOverSpeedLimit ?? this.isOverSpeedLimit,
     );
   }
 }
@@ -50,6 +62,7 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
   StreamSubscription<Position>? _positionStream;
   StreamSubscription<Map<String, dynamic>?>? _bgStreamSubscription;
   bool _mounted = true;
+  bool _hasAlertedCurrentSession = false;
 
   @override
   TripState build() {
@@ -124,6 +137,10 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
       return "Location permissions are denied.";
     }
 
+    if (SettingsService.keepScreenAwake) {
+      WakelockPlus.enable();
+    }
+
     BackgroundService.start();
 
     // Calibration: Fetch exact absolute coordinate instantly before tracker loop buffers.
@@ -159,6 +176,8 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
     LogService.info("Starting trip with title: ${tripTitle != null ? '[TRIP_TITLE_SET]' : 'UNSET'}, car: ${carDetails != null ? '[CAR_NAME_SET]' : 'UNSET'}");
     _positionStream?.cancel(); // Kill local stream since BackgroundEngine tracks now
     
+    _hasAlertedCurrentSession = false;
+
     return null; // success
   }
 
@@ -190,6 +209,7 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
     final lon = data['longitude'] as double;
     final speed = data['speed'] as double;
     final accuracy = data['accuracy'] as double;
+    final heading = (data['heading'] ?? 0.0) as double;
     final timestampStr = data['timestamp'] as String;
     
     double currentSpeed = speed * 3.6; // convert m/s to km/h
@@ -208,6 +228,7 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
       latitude: lat,
       longitude: lon,
       timestamp: DateTime.parse(timestampStr),
+      speed: currentSpeed,
     );
     
     final trip = state.activeTrip!; 
@@ -238,17 +259,39 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
       trip.maxSpeed = currentSpeed;
     }
 
+    _handleSpeedAlert(currentSpeed);
+
     state = TripState(
       status: state.status,
       activeTrip: trip,
       currentSpeed: currentSpeed,
       latestLat: lat,
       latestLon: lon,
+      latestHeading: heading,
+      isOverSpeedLimit: currentSpeed > SettingsService.speedLimit,
     );
+  }
+
+  void _handleSpeedAlert(double currentSpeed) {
+    final limit = SettingsService.speedLimit;
+    
+    // Trigger
+    if (currentSpeed > limit && !_hasAlertedCurrentSession) {
+      _hasAlertedCurrentSession = true;
+      NotificationService.showSpeedAlert(currentSpeed, limit);
+      Vibration.vibrate(duration: 500, amplitude: 255); // Heavy pulse
+      LogService.info("Speed alert triggered: $currentSpeed km/h (Limit: $limit)");
+    } 
+    // Hysteresis reset (drop 5km/h below limit)
+    else if (_hasAlertedCurrentSession && currentSpeed < (limit - 5.0)) {
+      _hasAlertedCurrentSession = false;
+      LogService.info("Speed alert reset (hysteresis): $currentSpeed km/h dropped 5km/h below limit");
+    }
   }
 
   void _processLocationUpdate(Position position) {
     double currentSpeed = position.speed * 3.6; // convert m/s to km/h
+    final double heading = position.heading;
     
     if (currentSpeed < 0.8) {
       currentSpeed = 0.0;
@@ -275,6 +318,7 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
       latitude: position.latitude,
       longitude: position.longitude,
       timestamp: position.timestamp,
+      speed: currentSpeed,
     );
     
     final trip = state.activeTrip!; // Riverpod notifies listeners if state is changed via copyWith, 
@@ -301,6 +345,8 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
       trip.maxSpeed = currentSpeed;
     }
 
+    _handleSpeedAlert(currentSpeed);
+
     // Force UI rebuild by explicitly establishing a fresh state copy
     state = TripState(
       status: state.status,
@@ -308,6 +354,8 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
       currentSpeed: currentSpeed,
       latestLat: position.latitude,
       latestLon: position.longitude,
+      latestHeading: heading,
+      isOverSpeedLimit: currentSpeed > SettingsService.speedLimit,
     );
   }
 
@@ -325,6 +373,7 @@ class TripTrackingNotifier extends Notifier<TripState> with WidgetsBindingObserv
 
   Future<void> endTrip() async {
     BackgroundService.stop();
+    WakelockPlus.disable();
 
     if (state.activeTrip != null) {
       final trip = state.activeTrip!;
