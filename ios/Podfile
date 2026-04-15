@@ -1,6 +1,10 @@
 # Platform version for iOS
 platform :ios, '13.0'
 
+# Load the Flutter podhelper script
+podhelper_path = File.expand_path(File.join('..', 'Flutter', 'podhelper.rb'), __FILE__)
+require podhelper_path
+
 # CocoaPods analytics sends network stats.
 # Set to 'true' to enable or 'false' to disable.
 install! 'cocoapods', :deterministic_uuids => false
