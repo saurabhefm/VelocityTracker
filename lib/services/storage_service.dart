@@ -16,7 +16,12 @@ class StorageService {
     await Hive.openBox<TripModel>(tripBoxName);
   }
 
-  static Box<TripModel> get tripsBox => Hive.box<TripModel>(tripBoxName);
+  static Box<TripModel> get tripsBox {
+    if (!Hive.isBoxOpen(tripBoxName)) {
+      throw HiveError('StorageService must be initialized before access. Call await StorageService.init() in main().');
+    }
+    return Hive.box<TripModel>(tripBoxName);
+  }
 
   static Future<void> saveTrip(TripModel trip) async {
     await tripsBox.put(trip.id, trip);

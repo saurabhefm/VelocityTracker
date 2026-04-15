@@ -8,9 +8,14 @@ class AuthService {
   static bool _hasPin = false;
 
   static Future<void> init() async {
-    final pin = await _storage.read(key: _pinKey);
-    _hasPin = pin != null && pin.isNotEmpty;
-    if (_hasPin) LogService.info('AuthService initialized: PIN Exists');
+    try {
+      final pin = await _storage.read(key: _pinKey).timeout(const Duration(seconds: 2));
+      _hasPin = pin != null && pin.isNotEmpty;
+      if (_hasPin) LogService.info('AuthService initialized: PIN Exists');
+    } catch (e) {
+      LogService.error('AuthService init timeout or error: $e');
+      _hasPin = false; // Default to no PIN if it hangs
+    }
   }
 
   static bool get hasPin => _hasPin;

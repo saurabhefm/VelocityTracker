@@ -6,21 +6,28 @@ class SettingsService {
   static const String _keyRotateWithCompass = 'rotate_with_compass';
   static const String _keySpeedLimit = 'speed_limit';
 
-  static late SharedPreferences _prefs;
+  static SharedPreferences? _prefs;
 
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
   }
 
-  static bool get keepScreenAwake => _prefs.getBool(_keyKeepScreenAwake) ?? true;
-  static set keepScreenAwake(bool value) => _prefs.setBool(_keyKeepScreenAwake, value);
+  static SharedPreferences get _safePrefs {
+    if (_prefs == null) {
+      throw StateError('SettingsService must be initialized before access. Call await SettingsService.init() in main().');
+    }
+    return _prefs!;
+  }
 
-  static bool get trackInBackground => _prefs.getBool(_keyTrackInBackground) ?? true;
-  static set trackInBackground(bool value) => _prefs.setBool(_keyTrackInBackground, value);
+  static bool get keepScreenAwake => _safePrefs.getBool(_keyKeepScreenAwake) ?? true;
+  static set keepScreenAwake(bool value) => _safePrefs.setBool(_keyKeepScreenAwake, value);
 
-  static bool get rotateWithCompass => _prefs.getBool(_keyRotateWithCompass) ?? false;
-  static set rotateWithCompass(bool value) => _prefs.setBool(_keyRotateWithCompass, value);
+  static bool get trackInBackground => _safePrefs.getBool(_keyTrackInBackground) ?? true;
+  static set trackInBackground(bool value) => _safePrefs.setBool(_keyTrackInBackground, value);
 
-  static double get speedLimit => _prefs.getDouble(_keySpeedLimit) ?? 80.0;
-  static set speedLimit(double value) => _prefs.setDouble(_keySpeedLimit, value);
+  static bool get rotateWithCompass => _safePrefs.getBool(_keyRotateWithCompass) ?? false;
+  static set rotateWithCompass(bool value) => _safePrefs.setBool(_keyRotateWithCompass, value);
+
+  static double get speedLimit => _safePrefs.getDouble(_keySpeedLimit) ?? 80.0;
+  static set speedLimit(double value) => _safePrefs.setDouble(_keySpeedLimit, value);
 }

@@ -13,13 +13,44 @@ import 'screens/pin_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await LogService.initialize(isBackground: false);
-  await StorageService.init();
-  await SettingsService.init();
-  await NotificationService.init();
-  await BackgroundService.initialize();
-  await AuthService.init();
-  runApp(const ProviderScope(child: VelocityLogApp()));
+  
+  try {
+    // Stage 1: Core Logging
+    await LogService.initialize(isBackground: false);
+    LogService.info("Starting application initialization...");
+    
+    // Stage 2: Database & Storage (CRITICAL - MUST AWAIT)
+    await StorageService.init();
+    await SettingsService.init();
+    
+    // Stage 3: Security & Identity
+    await AuthService.init();
+    
+    // Stage 4: Launch UI
+    runApp(const ProviderScope(child: VelocityLogApp()));
+
+    // Stage 5: Secondary Services (Non-critical platform channel work)
+    _initHeavyServices();
+    
+  } catch (e, stack) {
+    debugPrint("FATAL STARTUP ERROR: $e");
+    debugPrint("Stack trace: $stack");
+    // Attempt rescue launch
+    runApp(const ProviderScope(child: VelocityLogApp()));
+  }
+}
+
+Future<void> _initHeavyServices() async {
+  try {
+    // Platform channel initializations can be slow; run them in parallel
+    await Future.wait([
+      NotificationService.init(),
+      BackgroundService.initialize(),
+    ]);
+    LogService.info("Platform heavy services ready");
+  } catch (e) {
+    LogService.error("Platform service init error: $e");
+  }
 }
 
 class VelocityLogApp extends StatelessWidget {

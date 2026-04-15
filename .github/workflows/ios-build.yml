@@ -9,7 +9,7 @@ on:
 jobs:
   build:
     name: Build iOS App
-    runs-on: macos-latest
+    runs-on: macos-14
 
     steps:
       - name: Checkout Code
@@ -18,12 +18,19 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          # Using your specific local version for parity
           flutter-version: '3.41.6' 
           channel: 'stable'
           cache: true
 
       - name: Get Dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
+          # Navigate to iOS and update pods to match the new SDKs
+          cd ios
+          pod repo update
+          pod install
+          cd ..
 
       - name: Build iOS (No Codesign)
         run: flutter build ios --release --no-codesign
@@ -38,6 +45,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: VelocityTracker-iOS-Release
-          # Point this to the IPA file created in the previous step
           path: VelocityTracker.ipa
           retention-days: 7
