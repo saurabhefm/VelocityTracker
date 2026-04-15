@@ -1,9 +1,12 @@
-# Platform version for iOS
-platform :ios, '13.0'
-
-# Load the Flutter podhelper script
+# Set the path to the podhelper
 podhelper_path = File.expand_path(File.join('..', 'Flutter', 'podhelper.rb'), __FILE__)
-require podhelper_path
+
+# Only require if it exists
+if File.exist?(podhelper_path)
+  require podhelper_path
+end
+
+platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats.
 # Set to 'true' to enable or 'false' to disable.
@@ -14,7 +17,11 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
-  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  # Only call if the method was loaded
+  if respond_to?(:flutter_install_all_ios_pods)
+    flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  end
+
   target 'RunnerTests' do
     inherit! :search_paths
   end
@@ -22,7 +29,7 @@ end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
-    flutter_additional_ios_build_settings(target)
+    flutter_additional_ios_build_settings(target) if respond_to?(:flutter_additional_ios_build_settings)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
     end
