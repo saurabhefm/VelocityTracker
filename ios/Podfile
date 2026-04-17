@@ -32,6 +32,11 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target) if respond_to?(:flutter_additional_ios_build_settings)
     target.build_configurations.each do |config|
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)', 'PERMISSION_LOCATION=1']
+      config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
+      config.build_settings['LIBRARY_SEARCH_PATHS'] ||= ['$(inherited)']
+      config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= ['$(inherited)']
+      # This line is critical for 'Module not found' errors
+      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       # Force the deployment target again to be safe
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
     end
